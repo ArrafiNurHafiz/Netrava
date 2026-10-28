@@ -84,7 +84,14 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
       // 1. Eksekusi Cepat Instan (1-3 ms): Luminance Edge & Obstacle Occupancy
       final fastAnalysis = FastProximityEngine.processFrame(image);
       if (fastAnalysis != null) {
-        final zone = await _arbitration.evaluateProximityAnalysis(fastAnalysis);
+        final zone = await _arbitration.evaluateProximityAnalysis(
+          fastAnalysis,
+          onAutoAiTrigger: () {
+            // PROAKTIF OTOMATIS: Pengguna terhenti di depan objek kritis (gerbang/pintu/palang)
+            // AI langsung menjelaskan tanpa perlu sentuh tombol
+            _triggerSemanticAiInspection();
+          },
+        );
         if (mounted && (zone != _currentZone || _detectedLabel != fastAnalysis.label)) {
           setState(() {
             _currentZone = zone;
@@ -173,17 +180,9 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
   }
 
   void _onDoubleTap() {
-    setState(() {
-      _arbitration.setSilentMode(!_arbitration.isSilentMode);
-    });
-
+    // Zero-UI Non-Visual: Ketuk 2x di sembarang layar untuk tanya situasi sekitar ke AI
     HapticService.triggerZone(ProximityZone.caution);
-
-    if (!_arbitration.isSilentMode) {
-      TtsService.speakStatus('Mode suara aktif');
-    } else {
-      TtsService.stop();
-    }
+    _triggerSemanticAiInspection();
   }
 
   void _onLongPress() {
@@ -421,7 +420,7 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
                   const SizedBox(height: 12),
                   // Zero-UI Gesture Guide
                   Text(
-                    'Instruksi Gestur: 1 Ketukan (Status) • 2 Ketukan (Mode Senyap) • Tekan Tahan (Jeda/Mulai)',
+                    'Instruksi Gestur: 1 Ketukan (Status) • 2 Ketukan (Tanya AI Lingkungan Sekitar) • Tekan Tahan (Jeda/Mulai)',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.white.withAlpha(153),

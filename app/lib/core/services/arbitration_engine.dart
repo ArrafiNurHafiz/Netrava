@@ -14,10 +14,22 @@ class ArbitrationEngine {
 
   DateTime _lastHapticTriggerTime = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _lastSpeechAlertTime = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime _lastAutoAiInspectionTime = DateTime.fromMillisecondsSinceEpoch(0);
 
   // Interval anti-fatigue agar tidak terjadi haptic & speech saturation
   static const Duration _hapticCooldown = Duration(milliseconds: 300);
   static const Duration _speechCooldown = Duration(milliseconds: 1800);
+  static const Duration _autoAiCooldown = Duration(seconds: 8);
+
+  bool _isAutoAiInspectionEligible(ProximityZone zone) {
+    if (zone != ProximityZone.critical) return false;
+    final now = DateTime.now();
+    if (now.difference(_lastAutoAiInspectionTime) >= _autoAiCooldown) {
+      _lastAutoAiInspectionTime = now;
+      return true;
+    }
+    return false;
+  }
 
   ProximityZone get currentZone => _currentZone;
   bool get isSilentMode => _isSilentMode;
@@ -40,7 +52,10 @@ class ArbitrationEngine {
   }
 
   /// Evaluasi hasil Fast Proximity Engine (Latensi 1-3 ms, Tanggap Seketika)
-  Future<ProximityZone> evaluateProximityAnalysis(ProximityAnalysis analysis) async {
+  Future<ProximityZone> evaluateProximityAnalysis(
+    ProximityAnalysis analysis, {
+    Function()? onAutoAiTrigger,
+  }) async {
     if (!_isActive) return ProximityZone.clear;
 
     final zone = analysis.zone;
@@ -71,6 +86,11 @@ class ArbitrationEngine {
         _lastSpeechAlertTime = now;
         await TtsService.speakAlert('Waspada!');
       }
+    }
+
+    // 3. Proaktif Otomatis: Saat pengguna terhenti di depan objek kritis (gerbang/pintu/tembok)
+    if (_isAutoAiInspectionEligible(zone) && onAutoAiTrigger != null) {
+      onAutoAiTrigger();
     }
 
     return zone;
