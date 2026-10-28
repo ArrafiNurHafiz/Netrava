@@ -120,7 +120,15 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
     TtsService.speakStatus('Menganalisis situasi sekitar...');
 
     try {
+      // Hentikan stream sesaat agar driver kamera Android dapat mengambil foto beresolusi penuh
+      await CameraService.stopImageStream();
+      await Future.delayed(const Duration(milliseconds: 150));
+
       final file = await CameraService.controller?.takePicture();
+
+      // Nyalakan kembali stream navigasi real-time
+      _startLiveCameraPipeline();
+
       if (file != null) {
         final bytes = await file.readAsBytes();
         final description = await SemanticInspectionService.inspectScene(
@@ -133,10 +141,11 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
             _detectedLabel = 'AI: $description';
           });
         } else {
-          TtsService.speakAlert('Gagal menganalisis situasi.');
+          TtsService.speakAlert('Gagal terhubung ke asisten AI.');
         }
       }
     } catch (_) {
+      _startLiveCameraPipeline();
       TtsService.speakAlert('Kamera sibuk.');
     } finally {
       if (mounted) {
