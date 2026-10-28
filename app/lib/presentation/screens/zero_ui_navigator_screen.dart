@@ -231,226 +231,732 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
     });
   }
 
-  Color _getZoneColor() {
-    switch (_currentZone) {
-      case ProximityZone.clear:
-        return const Color(0xFF0F172A); // Slate gelap
-      case ProximityZone.awareness:
-        return const Color(0xFF1E3A8A); // Biru (Jauh)
-      case ProximityZone.caution:
-        return const Color(0xFFB45309); // Amber / Jingga (Waspada)
-      case ProximityZone.critical:
-        return const Color(0xFF991B1B); // Merah Tua (Bahaya Berhenti)
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final bool isClear = _currentZone == ProximityZone.clear;
+    final bool isAwareness = _currentZone == ProximityZone.awareness;
+    final bool isCaution = _currentZone == ProximityZone.caution;
+    final bool isCritical = _currentZone == ProximityZone.critical;
+
     return Scaffold(
-      backgroundColor: _getZoneColor(),
+      backgroundColor: const Color(0xFFF3F7FC), // Soft modern light grey-blue
       body: SafeArea(
         child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
+          behavior: HitTestBehavior.translucent,
           onTap: _onSingleTap,
           onDoubleTap: _onDoubleTap,
           onLongPress: _onLongPress,
-          child: SizedBox.expand(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header
-                  const Text(
-                    'NETRAVA',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2.0,
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. TOP APP BAR / HEADER
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.menu, color: Color(0xFF1E293B)),
+                      onPressed: () {},
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Asisten Taktil Rintangan Kepala & Dada',
-                    style: TextStyle(
-                      color: Colors.white.withAlpha(204),
-                      fontSize: 14,
-                    ),
-                  ),
-                  const Spacer(),
-
-                    // Center Guidance
-                  Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Live Camera Feed Widget (Krusial agar hardware pipeline Android CameraX aktif mengirim frame)
-                        if (_isCameraReady && CameraService.controller != null)
-                          Container(
-                            width: 140,
-                            height: 140,
-                            margin: const EdgeInsets.only(bottom: 16),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: _isAiInspecting ? Colors.amberAccent : Colors.white30,
-                                width: 2,
-                              ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          RichText(
+                            text: const TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: 'NETR',
+                                  style: TextStyle(
+                                    color: Color(0xFF0F172A),
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 1.5,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: 'AVA',
+                                  style: TextStyle(
+                                    color: Color(0xFF4F46E5),
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 1.5,
+                                  ),
+                                ),
+                              ],
                             ),
-                            clipBehavior: Clip.antiAlias,
-                            child: CameraPreview(CameraService.controller!),
-                          )
-                        else
-                          Icon(
+                          ),
+                          const Text(
+                            'Asisten Taktil Rintangan Kepala & Dada',
+                            style: TextStyle(
+                              color: Color(0xFF64748B),
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Battery indicator pill
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x0A000000),
+                            blurRadius: 4,
+                            offset: Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.battery_std, size: 14, color: Color(0xFF16A34A)),
+                          SizedBox(width: 4),
+                          Text(
+                            '85%',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E293B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    IconButton(
+                      icon: const Icon(Icons.settings_outlined, color: Color(0xFF475569), size: 20),
+                      onPressed: () {},
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 14),
+
+                // 2. CAMERA PREVIEW CARD (Rounded Card with live active feed)
+                Container(
+                  height: 200,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x14000000),
+                        blurRadius: 10,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (_isCameraReady && CameraService.controller != null)
+                        CameraPreview(CameraService.controller!)
+                      else
+                        Container(
+                          color: const Color(0xFF0F172A),
+                          child: const Center(
+                            child: Icon(Icons.videocam_off, color: Colors.white38, size: 48),
+                          ),
+                        ),
+
+                      // Overlay Top-Left: "Kamera Aktif" Pill
+                      Positioned(
+                        top: 10,
+                        left: 10,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: const Color(0x99000000),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF22C55E),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'Kamera Aktif',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // Overlay Top-Right: Crop/Expand Pill
+                      Positioned(
+                        top: 10,
+                        right: 10,
+                        child: Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: const Color(0x99000000),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Icon(Icons.crop_free, size: 16, color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 14),
+
+                // 3. MAIN STATUS CARD (JALUR AMAN / RINTANGAN)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: isCritical
+                          ? const Color(0xFFFCA5A5)
+                          : isCaution
+                              ? const Color(0xFFFDE68A)
+                              : const Color(0xFFE0E7FF),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: isCritical
+                            ? const Color(0x1ADB0000)
+                            : isCaution
+                                ? const Color(0x1AD97706)
+                                : const Color(0x122563EB),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      // Concentric Circle Icon Badge
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: (isCritical
+                              ? const Color(0xFFFEE2E2)
+                              : isCaution
+                                  ? const Color(0xFFFEF3C7)
+                                  : const Color(0xFFEFF6FF)),
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: (isCritical
+                                ? const Color(0xFFFECACA)
+                                : isCaution
+                                    ? const Color(0xFFFDE68A)
+                                    : const Color(0xFFDBEAFE)),
+                          ),
+                          child: Icon(
                             _isAiInspecting
                                 ? Icons.auto_awesome
-                                : _currentZone == ProximityZone.clear
-                                    ? Icons.check_circle_outline
-                                    : _currentZone == ProximityZone.critical
-                                        ? Icons.warning_amber_rounded
-                                        : Icons.vibration,
-                            color: _isAiInspecting ? Colors.amberAccent : Colors.white,
-                            size: 72,
-                          ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _isAiInspecting
-                              ? 'AI SEDANG MENGANALISIS...'
-                              : _currentZone == ProximityZone.clear
-                                  ? 'JALUR AMAN'
-                                  : _currentZone == ProximityZone.awareness
-                                      ? 'RINTANGAN JAUH (> 2M)'
-                                      : _currentZone == ProximityZone.caution
-                                          ? 'WASPADA DEKAT (1-2M)'
-                                          : 'BAHAYA KRITIS! BERHENTI (< 1M)',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: _isAiInspecting ? Colors.amberAccent : Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
+                                : isCritical
+                                    ? Icons.warning_amber_rounded
+                                    : isCaution
+                                        ? Icons.error_outline
+                                        : Icons.shield_outlined,
+                            size: 28,
+                            color: isCritical
+                                ? const Color(0xFFDC2626)
+                                : isCaution
+                                    ? const Color(0xFFD97706)
+                                    : const Color(0xFF2563EB),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Deteksi: $_detectedLabel',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white.withAlpha(204),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const Spacer(),
-
-                  // Interactive Simulation Controls for Demo
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withAlpha(102),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'PENGUJIAN SENSOR RINTANGAN (SIMULASI ALUR):',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.purple.shade700,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                            ),
-                            onPressed: _triggerSemanticAiInspection,
-                            icon: const Icon(Icons.auto_awesome, size: 18),
-                            label: const Text('Tanya AI Situasi Sekitar (9Router Rap)'),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
+                      ),
+                      const SizedBox(height: 12),
+                      RichText(
+                        textAlign: TextAlign.center,
+                        text: TextSpan(
                           children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blueGrey,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                ),
-                                onPressed: () => _simulateObstacleZone(ProximityZone.clear),
-                                child: const Text('Aman'),
+                            const TextSpan(
+                              text: 'JALUR ',
+                              style: TextStyle(
+                                color: Color(0xFF0F172A),
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
                               ),
                             ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blue.shade700,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                ),
-                                onPressed: () => _simulateObstacleZone(ProximityZone.awareness),
-                                child: const Text('> 2m'),
+                            TextSpan(
+                              text: _isAiInspecting
+                                  ? 'ANALISIS AI...'
+                                  : isCritical
+                                      ? 'KRITIS (< 1M)'
+                                      : isCaution
+                                          ? 'WASPADA (1-2M)'
+                                          : isAwareness
+                                              ? 'AWAS (> 2M)'
+                                              : 'AMAN',
+                              style: TextStyle(
+                                color: isCritical
+                                    ? const Color(0xFFDC2626)
+                                    : isCaution
+                                        ? const Color(0xFFD97706)
+                                        : const Color(0xFF2563EB),
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
                               ),
                             ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.amber.shade800,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                ),
-                                onPressed: () => _simulateObstacleZone(ProximityZone.caution),
-                                child: const Text('1-2m'),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Deteksi: $_detectedLabel',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 18),
+
+                // 4. SENSOR SECTION TITLE & QUICK ACTION
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.tune_rounded, size: 18, color: Color(0xFF2563EB)),
+                        SizedBox(width: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Simulasi Sensor Rintangan',
+                              style: TextStyle(
+                                color: Color(0xFF0F172A),
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red.shade700,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                ),
-                                onPressed: () => _simulateObstacleZone(ProximityZone.critical),
-                                child: const Text('< 1m'),
+                            Text(
+                              'Simulasi jarak...',
+                              style: TextStyle(
+                                color: Color(0xFF94A3B8),
+                                fontSize: 10,
                               ),
                             ),
                           ],
                         ),
                       ],
                     ),
-                  ),
+                    Text(
+                      'Uji Sensor >',
+                      style: TextStyle(
+                        color: Color(0xFF2563EB),
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
 
-                  const SizedBox(height: 12),
-                  // Zero-UI Gesture Guide
-                  Text(
-                    'Instruksi Gestur: 1 Ketukan (Status) • 2 Ketukan (Tanya AI Lingkungan Sekitar) • Tekan Tahan (Jeda/Mulai)',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white.withAlpha(153),
-                      fontSize: 11,
+                const SizedBox(height: 10),
+
+                // 5. 4-COLUMN SENSOR DISTANCE CARDS
+                Row(
+                  children: [
+                    // Card 1: Aman
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _simulateObstacleZone(ProximityZone.clear),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isClear ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
+                              width: isClear ? 2 : 1,
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x08000000),
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.check_circle_rounded,
+                                size: 20,
+                                color: isClear ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Aman',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              const Icon(Icons.directions_walk, size: 18, color: Color(0xFF64748B)),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Tidak ada rintangan',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 8.5, color: Color(0xFF94A3B8)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+
+                    // Card 2: > 2m
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _simulateObstacleZone(ProximityZone.awareness),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isAwareness ? const Color(0xFF3B82F6) : const Color(0xFFE2E8F0),
+                              width: isAwareness ? 2 : 1,
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x08000000),
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.info_outline_rounded,
+                                size: 20,
+                                color: isAwareness ? const Color(0xFF3B82F6) : const Color(0xFF94A3B8),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                '> 2 m',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              const Icon(Icons.near_me_outlined, size: 18, color: Color(0xFF64748B)),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Jarak jauh',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 8.5, color: Color(0xFF94A3B8)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+
+                    // Card 3: 1 - 2m
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _simulateObstacleZone(ProximityZone.caution),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFFBEB), // Soft amber tint
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isCaution ? const Color(0xFFD97706) : const Color(0xFFFDE68A),
+                              width: isCaution ? 2 : 1,
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x0FCA8A04),
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.error_outline_rounded,
+                                size: 20,
+                                color: isCaution ? const Color(0xFFD97706) : const Color(0xFFF59E0B),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                '1 - 2 m',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              const Icon(Icons.warning_amber_rounded, size: 18, color: Color(0xFFD97706)),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Rintangan dekat',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 8.5, color: Color(0xFFB45309)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+
+                    // Card 4: < 1m
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _simulateObstacleZone(ProximityZone.critical),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF2F2), // Soft red tint
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isCritical ? const Color(0xFFDC2626) : const Color(0xFFFECACA),
+                              width: isCritical ? 2 : 1,
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x10DC2626),
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.dangerous_rounded,
+                                size: 20,
+                                color: isCritical ? const Color(0xFFDC2626) : const Color(0xFFEF4444),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                '< 1 m',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              const Icon(Icons.front_hand_rounded, size: 18, color: Color(0xFFDC2626)),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Rintangan sangat dekat',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 8, color: Color(0xFFB91C1C)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // 6. ACTION BUTTON: "Tanya AI Situasi Sekitar" (Primary Action Pill)
+                GestureDetector(
+                  onTap: _triggerSemanticAiInspection,
+                  child: Container(
+                    height: 54,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                      borderRadius: BorderRadius.circular(27),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x552563EB),
+                          blurRadius: 12,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.auto_awesome, color: Colors.white, size: 20),
+                            SizedBox(width: 12),
+                            Text(
+                              'Tanya AI Situasi Sekitar',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: const BoxDecoration(
+                            color: Color(0x33FFFFFF),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 18),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+
+                const SizedBox(height: 14),
+
+                // 7. FOOTER CARD: "Instruksi Gestur"
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x08000000),
+                        blurRadius: 4,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFF2563EB)),
+                          SizedBox(width: 6),
+                          Text(
+                            'Instruksi Gestur',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          _buildGestureStep('1', 'Ketukan (Status)'),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 4),
+                            child: Icon(Icons.chevron_right, size: 14, color: Color(0xFFCBD5E1)),
+                          ),
+                          _buildGestureStep('2', 'Ketukan (Tanya AI)'),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 4),
+                            child: Icon(Icons.chevron_right, size: 14, color: Color(0xFFCBD5E1)),
+                          ),
+                          Expanded(
+                            child: _buildGestureStep('3', 'Tahan (Jeda/Mulai)'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildGestureStep(String number, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            number,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF475569),
+            ),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            label,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 10,
+              color: Color(0xFF64748B),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

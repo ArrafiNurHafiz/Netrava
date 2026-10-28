@@ -12,8 +12,9 @@ void main() {
     await tester.pumpWidget(const NetravaApp());
 
     // Pastikan Judul Aplikasi tampil
-    expect(find.text('NETRAVA'), findsOneWidget);
-    expect(find.text('JALUR AMAN'), findsOneWidget);
+    expect(find.text('Asisten Taktil Rintangan Kepala & Dada'), findsOneWidget);
+    expect(find.text('Simulasi Sensor Rintangan'), findsOneWidget);
+    expect(find.text('Tanya AI Situasi Sekitar'), findsOneWidget);
   });
 
   test('HapticPatterns timing consistency test', () {
