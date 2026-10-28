@@ -5,6 +5,7 @@ import '../../core/services/tts_service.dart';
 import '../../core/services/camera_service.dart';
 import '../../core/services/vision_service.dart';
 import '../../core/services/depth_estimation_service.dart';
+import '../../core/services/yolo_detection_service.dart';
 import '../../core/services/arbitration_engine.dart';
 import '../../core/services/foreground_service.dart';
 import '../../core/services/permission_service.dart';
@@ -43,9 +44,10 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
     // 2. Inisialisasi Google TTS Luring
     await TtsService.initialize();
 
-    // 3. Inisialisasi Model Vision & MiDaS Depth
+    // 3. Inisialisasi Model Vision & YOLOv8n
     await VisionService.initialize();
     await DepthEstimationService.initialize();
+    await YoloDetectionService.initialize();
 
     // 4. Inisialisasi Kamera Belakang jika izin diberikan
     bool cameraOk = false;
@@ -75,25 +77,42 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
     }
   }
 
-  /// Menghubungkan CameraX Stream ke Neural MiDaS Depth Engine Asli
+  /// Menghubungkan CameraX Stream ke Dual Engine: YOLOv8n (Objek Nyata) + MiDaS (Kedalaman Permukaan)
   void _startLiveCameraPipeline() {
     CameraService.startImageStream((image) async {
       if (!_isScanning) return;
 
-      // 1. Eksekusi Model Neural Network MiDaS Depth (Akurasi Tinggi & Cepat)
+      // 1. Prioritas Utama: YOLOv8 Object Detection (Mendeteksi Orang, Motor, Mobil, Kursi, Meja, Tiang)
+      final yoloResult = await YoloDetectionService.detectObstacles(image);
+      if (yoloResult != null && yoloResult.detections.isNotEmpty) {
+        final zone = await _arbitration.evaluateYoloResult(
+          yoloResult,
+          onAutoAiTrigger: () {
+            _triggerSemanticAiInspection();
+          },
+        );
+        if (mounted && (zone != _currentZone || _detectedLabel != yoloResult.alertMessage)) {
+          setState(() {
+            _currentZone = zone;
+            _detectedLabel = '${yoloResult.alertMessage} (${yoloResult.latencyMs}ms)';
+          });
+        }
+        return;
+      }
+
+      // 2. Evaluasi Sekunder: MiDaS Depth Engine untuk Tembok Polos / Permukaan Datar
       final depthResult = await DepthEstimationService.processCameraFrame(image);
       if (depthResult != null) {
         final zone = await _arbitration.evaluateDepthResult(
           depthResult,
           onAutoAiTrigger: () {
-            // PROAKTIF OTOMATIS: Pengguna terhenti di depan objek kritis (gerbang/pintu/palang)
             _triggerSemanticAiInspection();
           },
         );
         if (mounted && (zone != _currentZone || _detectedLabel != depthResult.label)) {
           setState(() {
             _currentZone = zone;
-            _detectedLabel = '${depthResult.label} (${depthResult.latencyMs}ms | D:${depthResult.centerDepth.toInt()})';
+            _detectedLabel = '${depthResult.label} (${depthResult.latencyMs}ms)';
           });
         }
       }
@@ -109,6 +128,7 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
     CameraService.dispose();
     VisionService.dispose();
     DepthEstimationService.dispose();
+    YoloDetectionService.dispose();
     TtsService.stop();
     HapticService.cancel();
     super.dispose();

@@ -4,8 +4,8 @@ import 'haptic_service.dart';
 import 'tts_service.dart';
 import 'vision_service.dart';
 import 'depth_estimation_service.dart';
-
 import 'fast_proximity_engine.dart';
+import 'yolo_detection_service.dart';
 
 class ArbitrationEngine {
   ProximityZone _currentZone = ProximityZone.clear;
@@ -49,6 +49,47 @@ class ArbitrationEngine {
       HapticService.cancel();
       TtsService.stop();
     }
+  }
+
+  /// Evaluasi hasil YOLO Object Detection (Akurasi Tinggi untuk Objek Nyata: Orang, Motor, Kursi, Tiang)
+  Future<ProximityZone> evaluateYoloResult(
+    YoloResult result, {
+    Function()? onAutoAiTrigger,
+  }) async {
+    if (!_isActive) return ProximityZone.clear;
+
+    final zone = result.zone;
+    _currentZone = zone;
+
+    final now = DateTime.now();
+
+    // 1. Eksekusi Haptik Taktil
+    if (zone != ProximityZone.clear) {
+      if (now.difference(_lastHapticTriggerTime) >= _hapticCooldown) {
+        _lastHapticTriggerTime = now;
+        await HapticService.triggerZone(zone);
+      }
+    } else {
+      await HapticService.cancel();
+    }
+
+    // 2. Eksekusi Suara Deskriptif Cepat (Sebutkan apa rintangannya)
+    if (!_isSilentMode && now.difference(_lastSpeechAlertTime) >= _speechCooldown) {
+      if (zone == ProximityZone.critical) {
+        _lastSpeechAlertTime = now;
+        await TtsService.speakAlert(result.alertMessage);
+      } else if (zone == ProximityZone.caution) {
+        _lastSpeechAlertTime = now;
+        await TtsService.speakAlert(result.alertMessage);
+      }
+    }
+
+    // 3. Proaktif Otomatis AI jika terhenti
+    if (_isAutoAiInspectionEligible(zone) && onAutoAiTrigger != null) {
+      onAutoAiTrigger();
+    }
+
+    return zone;
   }
 
   /// Evaluasi hasil Fast Proximity Engine (Latensi 1-3 ms, Tanggap Seketika)

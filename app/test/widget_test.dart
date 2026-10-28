@@ -5,6 +5,7 @@ import 'package:netrava_app/core/constants/haptic_patterns.dart';
 import 'package:netrava_app/core/services/vision_service.dart';
 import 'package:netrava_app/core/services/depth_estimation_service.dart';
 import 'package:netrava_app/core/services/fast_proximity_engine.dart';
+import 'package:netrava_app/core/services/yolo_detection_service.dart';
 import 'package:netrava_app/core/services/arbitration_engine.dart';
 import 'package:netrava_app/core/services/foreground_service.dart';
 import 'package:netrava_app/core/services/permission_service.dart';
@@ -85,6 +86,30 @@ void main() {
       );
 
       final evaluatedZone = await engine.evaluateDepthResult(criticalDepth);
+      expect(evaluatedZone, ProximityZone.critical);
+      expect(engine.currentZone, ProximityZone.critical);
+    });
+
+    test('YoloResult evaluated correctly by ArbitrationEngine', () async {
+      final engine = ArbitrationEngine();
+
+      final yoloObstacle = YoloDetection(
+        label: 'Orang',
+        confidence: 0.88,
+        zone: ProximityZone.critical,
+        heightRatio: 0.65,
+        centerX: 0.50,
+        isUpperHazard: true,
+      );
+
+      final yoloResult = YoloResult(
+        zone: ProximityZone.critical,
+        alertMessage: 'Awas Orang Dekat!',
+        detections: [yoloObstacle],
+        latencyMs: 25,
+      );
+
+      final evaluatedZone = await engine.evaluateYoloResult(yoloResult);
       expect(evaluatedZone, ProximityZone.critical);
       expect(engine.currentZone, ProximityZone.critical);
     });
