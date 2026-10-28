@@ -4,9 +4,7 @@ import '../../core/constants/haptic_patterns.dart';
 import '../../core/services/haptic_service.dart';
 import '../../core/services/tts_service.dart';
 import '../../core/services/camera_service.dart';
-import '../../core/services/vision_service.dart';
-import '../../core/services/depth_estimation_service.dart';
-import '../../core/services/yolo_detection_service.dart';
+import '../../core/services/deterministic_proximity_engine.dart';
 import '../../core/services/arbitration_engine.dart';
 import '../../core/services/foreground_service.dart';
 import '../../core/services/permission_service.dart';
@@ -45,12 +43,7 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
     // 2. Inisialisasi Google TTS Luring
     await TtsService.initialize();
 
-    // 3. Inisialisasi Model Vision & YOLOv8n
-    await VisionService.initialize();
-    await DepthEstimationService.initialize();
-    await YoloDetectionService.initialize();
-
-    // 4. Inisialisasi Kamera Belakang jika izin diberikan
+    // 3. Inisialisasi Kamera Belakang jika izin diberikan
     bool cameraOk = false;
     if (permissionsGranted) {
       cameraOk = await CameraService.initialize();
@@ -78,70 +71,27 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
     }
   }
 
-  DateTime _lastInferenceTime = DateTime.fromMillisecondsSinceEpoch(0);
-  bool _isFrameBusy = false;
-
-  /// Menghubungkan CameraX Stream ke Pipeline Ter-Throttle (Hemat Baterai & Bebas Lag)
+  /// Menghubungkan CameraX Stream ke Mesin Deterministik Super Ringan (< 2 ms)
   void _startLiveCameraPipeline() {
     CameraService.startImageStream((image) async {
-      if (!_isScanning || _isFrameBusy) return;
+      if (!_isScanning) return;
 
-      final now = DateTime.now();
-      // Throttle cerdas: Proses maksimal 3 - 4 frame per detik (interval 280ms)
-      // Mencegah lag antrean UI thread dan baterai panas
-      if (now.difference(_lastInferenceTime).inMilliseconds < 280) {
-        return;
-      }
+      // Pemrosesan instan 16x16 grid murni integer tanpa neural network
+      final reading = DeterministicProximityEngine.processFrame(image);
+      if (reading != null) {
+        final zone = await _arbitration.evaluateReading(
+          reading,
+          onAutoAiTrigger: () {
+            _triggerSemanticAiInspection();
+          },
+        );
 
-      _isFrameBusy = true;
-      _lastInferenceTime = now;
-
-      try {
-        // 1. Prioritas Utama: YOLOv8 Object Detection (Orang, Kursi, Meja, Motor, Tiang)
-        final yoloResult = await YoloDetectionService.detectObstacles(image);
-        if (yoloResult != null && yoloResult.detections.isNotEmpty) {
-          final zone = await _arbitration.evaluateYoloResult(
-            yoloResult,
-            onAutoAiTrigger: () {
-              _triggerSemanticAiInspection();
-            },
-          );
-          if (mounted && (zone != _currentZone || _detectedLabel != yoloResult.alertMessage)) {
-            setState(() {
-              _currentZone = zone;
-              _detectedLabel = '${yoloResult.alertMessage} (${yoloResult.latencyMs}ms)';
-            });
-          }
-          return;
+        if (mounted && (zone != _currentZone || _detectedLabel != reading.label)) {
+          setState(() {
+            _currentZone = zone;
+            _detectedLabel = '${reading.label} (${reading.latencyMs}ms)';
+          });
         }
-
-        // 2. Evaluasi Sekunder: MiDaS Depth Engine untuk Tembok Polos / Permukaan Datar
-        final depthResult = await DepthEstimationService.processCameraFrame(image);
-        if (depthResult != null) {
-          final zone = await _arbitration.evaluateDepthResult(
-            depthResult,
-            onAutoAiTrigger: () {
-              _triggerSemanticAiInspection();
-            },
-          );
-          if (mounted && (zone != _currentZone || _detectedLabel != depthResult.label)) {
-            setState(() {
-              _currentZone = zone;
-              _detectedLabel = '${depthResult.label} (${depthResult.latencyMs}ms)';
-            });
-          }
-        } else {
-          if (_currentZone != ProximityZone.clear) {
-            setState(() {
-              _currentZone = ProximityZone.clear;
-              _detectedLabel = 'Jalur Bersih';
-            });
-            HapticService.cancel();
-          }
-        }
-      } catch (_) {
-      } finally {
-        _isFrameBusy = false;
       }
     });
   }
@@ -153,9 +103,6 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
     } catch (_) {}
     ForegroundService.stopService();
     CameraService.dispose();
-    VisionService.dispose();
-    DepthEstimationService.dispose();
-    YoloDetectionService.dispose();
     TtsService.stop();
     HapticService.cancel();
     super.dispose();
@@ -252,26 +199,26 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
   void _simulateObstacleZone(ProximityZone zone) async {
     if (!_isScanning) return;
     
-    // Buat objek simulasi sesuai tombol demo
-    final simulatedObstacle = DetectedObstacle(
-      label: zone == ProximityZone.critical
-          ? 'Tiang / Dahan'
-          : zone == ProximityZone.caution
-              ? 'Pejalan Kaki'
-              : 'Objek Jauh',
-      confidence: 0.95,
-      boundingBox: const Rect.fromLTWH(50, 50, 300, 300),
+    final simulatedReading = ProximityReading(
       zone: zone,
-      isUpperBodyHazard: zone == ProximityZone.critical,
+      obstacleIntensity: zone == ProximityZone.critical
+          ? 0.8
+          : zone == ProximityZone.caution
+              ? 0.4
+              : 0.15,
+      label: zone == ProximityZone.critical
+          ? 'Tiang / Dahan Dekat'
+          : zone == ProximityZone.caution
+              ? 'Pejalan Kaki (1-2M)'
+              : 'Objek Jauh (> 2M)',
+      latencyMs: 1,
     );
 
-    final evaluatedZone = await _arbitration.evaluateObstacles(
-      zone == ProximityZone.clear ? [] : [simulatedObstacle],
-    );
+    final evaluatedZone = await _arbitration.evaluateReading(simulatedReading);
 
     setState(() {
       _currentZone = evaluatedZone;
-      _detectedLabel = simulatedObstacle.label;
+      _detectedLabel = simulatedReading.label;
     });
   }
 
