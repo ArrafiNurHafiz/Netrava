@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'dart:ui';
 import 'package:netrava_app/main.dart';
 import 'package:netrava_app/core/constants/haptic_patterns.dart';
+import 'package:netrava_app/core/services/vision_service.dart';
 
 void main() {
   testWidgets('Netrava smoke test renders app and zero-ui', (WidgetTester tester) async {
@@ -16,5 +18,35 @@ void main() {
     expect(HapticPatterns.awarenessTimings.length, 3);
     expect(HapticPatterns.awarenessAmplitudes.length, 3);
     expect(HapticPatterns.criticalAmplitudes.last, 255);
+  });
+
+  group('VisionService Proximity & Upper Hazard Tests', () {
+    const frameSize = Size(480, 640);
+
+    test('Critical proximity calculated for dominating bounding box', () {
+      const bigBox = Rect.fromLTWH(50, 50, 400, 500);
+      final zone = VisionService.calculateProximity(bigBox, frameSize);
+      expect(zone, ProximityZone.critical);
+    });
+
+    test('Caution proximity for medium distance obstacle', () {
+      const medBox = Rect.fromLTWH(100, 150, 200, 250);
+      final zone = VisionService.calculateProximity(medBox, frameSize);
+      expect(zone, ProximityZone.caution);
+    });
+
+    test('Awareness proximity for distant obstacle', () {
+      const smallBox = Rect.fromLTWH(150, 150, 100, 130);
+      final zone = VisionService.calculateProximity(smallBox, frameSize);
+      expect(zone, ProximityZone.awareness);
+    });
+
+    test('Upper hazard detection recognizes head/chest level obstacles', () {
+      const headLevelBox = Rect.fromLTWH(100, 50, 150, 150);
+      expect(VisionService.isUpperHazard(headLevelBox, frameSize), isTrue);
+
+      const floorBox = Rect.fromLTWH(100, 500, 150, 120);
+      expect(VisionService.isUpperHazard(floorBox, frameSize), isFalse);
+    });
   });
 }
