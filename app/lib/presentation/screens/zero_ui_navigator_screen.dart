@@ -9,6 +9,7 @@ import '../../core/services/fast_proximity_engine.dart';
 import '../../core/services/arbitration_engine.dart';
 import '../../core/services/foreground_service.dart';
 import '../../core/services/permission_service.dart';
+import '../../core/services/semantic_inspection_service.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 class ZeroUiNavigatorScreen extends StatefulWidget {
@@ -24,6 +25,7 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
   ProximityZone _currentZone = ProximityZone.clear;
   bool _hasAmplitude = false;
   bool _isCameraReady = false;
+  bool _isAiInspecting = false;
   String _detectedLabel = 'Jalur Bersih';
 
   @override
@@ -105,6 +107,45 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
     TtsService.stop();
     HapticService.cancel();
     super.dispose();
+  }
+
+  /// On-Demand Semantic Scene Inspection via 9Router Combo Rap (Gemini Backend)
+  Future<void> _triggerSemanticAiInspection() async {
+    if (_isAiInspecting || !CameraService.isInitialized) return;
+
+    setState(() {
+      _isAiInspecting = true;
+    });
+
+    HapticService.triggerZone(ProximityZone.awareness);
+    TtsService.speakStatus('Menganalisis situasi sekitar...');
+
+    try {
+      final file = await CameraService.controller?.takePicture();
+      if (file != null) {
+        final bytes = await file.readAsBytes();
+        final description = await SemanticInspectionService.inspectScene(
+          imageJpgBytes: bytes,
+        );
+
+        if (description != null && description.isNotEmpty) {
+          TtsService.speakStatus(description);
+          setState(() {
+            _detectedLabel = 'AI: $description';
+          });
+        } else {
+          TtsService.speakAlert('Gagal menganalisis situasi.');
+        }
+      }
+    } catch (_) {
+      TtsService.speakAlert('Kamera sibuk.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAiInspecting = false;
+        });
+      }
+    }
   }
 
   void _onSingleTap() {
@@ -239,32 +280,36 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
                   ),
                   const Spacer(),
 
-                  // Center Guidance
+                    // Center Guidance
                   Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          _currentZone == ProximityZone.clear
-                              ? Icons.check_circle_outline
-                              : _currentZone == ProximityZone.critical
-                                  ? Icons.warning_amber_rounded
-                                  : Icons.vibration,
-                          color: Colors.white,
+                          _isAiInspecting
+                              ? Icons.auto_awesome
+                              : _currentZone == ProximityZone.clear
+                                  ? Icons.check_circle_outline
+                                  : _currentZone == ProximityZone.critical
+                                      ? Icons.warning_amber_rounded
+                                      : Icons.vibration,
+                          color: _isAiInspecting ? Colors.amberAccent : Colors.white,
                           size: 72,
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          _currentZone == ProximityZone.clear
-                              ? 'JALUR AMAN'
-                              : _currentZone == ProximityZone.awareness
-                                  ? 'RINTANGAN JAUH (> 2M)'
-                                  : _currentZone == ProximityZone.caution
-                                      ? 'WASPADA DEKAT (1-2M)'
-                                      : 'BAHAYA KRITIS! BERHENTI (< 1M)',
+                          _isAiInspecting
+                              ? 'AI SEDANG MENGANALISIS...'
+                              : _currentZone == ProximityZone.clear
+                                  ? 'JALUR AMAN'
+                                  : _currentZone == ProximityZone.awareness
+                                      ? 'RINTANGAN JAUH (> 2M)'
+                                      : _currentZone == ProximityZone.caution
+                                          ? 'WASPADA DEKAT (1-2M)'
+                                          : 'BAHAYA KRITIS! BERHENTI (< 1M)',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: _isAiInspecting ? Colors.amberAccent : Colors.white,
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
@@ -272,6 +317,7 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
                         const SizedBox(height: 8),
                         Text(
                           'Deteksi: $_detectedLabel',
+                          textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white.withAlpha(204),
                             fontSize: 14,
@@ -300,6 +346,20 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
                             color: Colors.white70,
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.purple.shade700,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                            ),
+                            onPressed: _triggerSemanticAiInspection,
+                            icon: const Icon(Icons.auto_awesome, size: 18),
+                            label: const Text('Tanya AI Situasi Sekitar (9Router Rap)'),
                           ),
                         ),
                         const SizedBox(height: 8),

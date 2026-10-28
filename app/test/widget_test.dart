@@ -8,6 +8,7 @@ import 'package:netrava_app/core/services/fast_proximity_engine.dart';
 import 'package:netrava_app/core/services/arbitration_engine.dart';
 import 'package:netrava_app/core/services/foreground_service.dart';
 import 'package:netrava_app/core/services/permission_service.dart';
+import 'package:netrava_app/core/services/semantic_inspection_service.dart';
 
 void main() {
   testWidgets('Netrava smoke test renders app and zero-ui', (WidgetTester tester) async {
@@ -93,6 +94,11 @@ void main() {
 
     test('PermissionService default granted check runs safely', () async {
       expect(await PermissionService.isCameraGranted(), isFalse);
+    });
+
+    test('SemanticInspectionService configured with 9Router rap', () {
+      expect(SemanticInspectionService.model, 'rap');
+      expect(SemanticInspectionService.isInspecting, isFalse);
     });
 
     test('Arbitration prioritizes critical upper hazard over clear state', () async {

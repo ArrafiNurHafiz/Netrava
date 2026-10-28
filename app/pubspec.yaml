@@ -4,7 +4,7 @@ description: "Netrava - Haptic & Audio AI Navigation Assistant for the Visually 
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
-version: 1.0.3+4
+version: 1.0.4+5
 
 environment:
   sdk: ^3.13.7
@@ -29,6 +29,7 @@ dependencies:
   wakelock_plus: ^1.8.2
   tflite_flutter: ^0.12.1
   image: ^4.12.0
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:
