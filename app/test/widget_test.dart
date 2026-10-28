@@ -4,6 +4,7 @@ import 'package:netrava_app/main.dart';
 import 'package:netrava_app/core/constants/haptic_patterns.dart';
 import 'package:netrava_app/core/services/vision_service.dart';
 import 'package:netrava_app/core/services/depth_estimation_service.dart';
+import 'package:netrava_app/core/services/fast_proximity_engine.dart';
 import 'package:netrava_app/core/services/arbitration_engine.dart';
 import 'package:netrava_app/core/services/foreground_service.dart';
 import 'package:netrava_app/core/services/permission_service.dart';
@@ -55,6 +56,22 @@ void main() {
   });
 
   group('ArbitrationEngine Tests', () {
+    test('FastProximityEngine evaluation triggers critical zone', () async {
+      final engine = ArbitrationEngine();
+
+      final fastAnalysis = ProximityAnalysis(
+        zone: ProximityZone.critical,
+        centralOccupancy: 0.55,
+        upperHazardScore: 0.50,
+        label: 'AWAS KEPALA!',
+        latencyMs: 2,
+      );
+
+      final zone = await engine.evaluateProximityAnalysis(fastAnalysis);
+      expect(zone, ProximityZone.critical);
+      expect(engine.currentZone, ProximityZone.critical);
+    });
+
     test('DepthResult evaluated correctly by ArbitrationEngine', () async {
       final engine = ArbitrationEngine();
 

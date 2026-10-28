@@ -5,6 +5,8 @@ import 'tts_service.dart';
 import 'vision_service.dart';
 import 'depth_estimation_service.dart';
 
+import 'fast_proximity_engine.dart';
+
 class ArbitrationEngine {
   ProximityZone _currentZone = ProximityZone.clear;
   bool _isSilentMode = false;
@@ -14,8 +16,8 @@ class ArbitrationEngine {
   DateTime _lastSpeechAlertTime = DateTime.fromMillisecondsSinceEpoch(0);
 
   // Interval anti-fatigue agar tidak terjadi haptic & speech saturation
-  static const Duration _hapticCooldown = Duration(milliseconds: 350);
-  static const Duration _speechCooldown = Duration(milliseconds: 2000);
+  static const Duration _hapticCooldown = Duration(milliseconds: 300);
+  static const Duration _speechCooldown = Duration(milliseconds: 1800);
 
   ProximityZone get currentZone => _currentZone;
   bool get isSilentMode => _isSilentMode;
@@ -35,6 +37,43 @@ class ArbitrationEngine {
       HapticService.cancel();
       TtsService.stop();
     }
+  }
+
+  /// Evaluasi hasil Fast Proximity Engine (Latensi 1-3 ms, Tanggap Seketika)
+  Future<ProximityZone> evaluateProximityAnalysis(ProximityAnalysis analysis) async {
+    if (!_isActive) return ProximityZone.clear;
+
+    final zone = analysis.zone;
+    _currentZone = zone;
+
+    final now = DateTime.now();
+
+    // 1. Eksekusi Haptik Taktil (80% Jalur Komunikasi)
+    if (zone != ProximityZone.clear) {
+      if (now.difference(_lastHapticTriggerTime) >= _hapticCooldown) {
+        _lastHapticTriggerTime = now;
+        await HapticService.triggerZone(zone);
+      }
+    } else {
+      await HapticService.cancel();
+    }
+
+    // 2. Eksekusi Suara Darurat Luring
+    if (!_isSilentMode && now.difference(_lastSpeechAlertTime) >= _speechCooldown) {
+      if (zone == ProximityZone.critical) {
+        _lastSpeechAlertTime = now;
+        if (analysis.upperHazardScore >= 0.45) {
+          await TtsService.speakAlert('Awas kepala!');
+        } else {
+          await TtsService.speakAlert('Berhenti!');
+        }
+      } else if (zone == ProximityZone.caution) {
+        _lastSpeechAlertTime = now;
+        await TtsService.speakAlert('Waspada!');
+      }
+    }
+
+    return zone;
   }
 
   /// Evaluasi hasil estimasi kedalaman fisik MiDaS (Prioritas Primer)

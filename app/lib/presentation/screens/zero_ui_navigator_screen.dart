@@ -5,6 +5,7 @@ import '../../core/services/tts_service.dart';
 import '../../core/services/camera_service.dart';
 import '../../core/services/vision_service.dart';
 import '../../core/services/depth_estimation_service.dart';
+import '../../core/services/fast_proximity_engine.dart';
 import '../../core/services/arbitration_engine.dart';
 import '../../core/services/foreground_service.dart';
 import '../../core/services/permission_service.dart';
@@ -73,46 +74,21 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
     }
   }
 
-  /// Menghubungkan CameraX Stream ke Dual Engine: MiDaS Depth + ML Kit Fallback
+  /// Menghubungkan CameraX Stream ke Instant Fast Proximity Engine (Zero-Lag)
   void _startLiveCameraPipeline() {
     CameraService.startImageStream((image) async {
       if (!_isScanning) return;
 
-      // 1. Prioritaskan Estimasi Kedalaman Fisik Nyata (MiDaS v2.1 Depth Map)
-      // Mampu mendeteksi tembok polos, pintu, tiang, kaca buram, dahan pohon
-      final depthResult = await DepthEstimationService.processCameraFrame(image);
-      if (depthResult != null) {
-        final zone = await _arbitration.evaluateDepthResult(depthResult);
-        if (mounted && zone != _currentZone) {
+      // 1. Eksekusi Cepat Instan (1-3 ms): Luminance Edge & Obstacle Occupancy
+      final fastAnalysis = FastProximityEngine.processFrame(image);
+      if (fastAnalysis != null) {
+        final zone = await _arbitration.evaluateProximityAnalysis(fastAnalysis);
+        if (mounted && (zone != _currentZone || _detectedLabel != fastAnalysis.label)) {
           setState(() {
             _currentZone = zone;
-            _detectedLabel = depthResult.label;
+            _detectedLabel = '${fastAnalysis.label} (${fastAnalysis.latencyMs}ms)';
           });
         }
-        return;
-      }
-
-      // 2. Fallback ke Bounding Box Object Detector jika Depth Engine busy
-      final camera = CameraService.cameraDescription;
-      if (camera == null) return;
-
-      final inputImage = VisionService.convertCameraImage(image, camera);
-      if (inputImage == null) return;
-
-      final size = Size(image.width.toDouble(), image.height.toDouble());
-      final obstacles = await VisionService.processImage(inputImage, size);
-
-      final zone = await _arbitration.evaluateObstacles(obstacles);
-
-      if (mounted && zone != _currentZone) {
-        setState(() {
-          _currentZone = zone;
-          if (obstacles.isNotEmpty) {
-            _detectedLabel = obstacles.first.label;
-          } else {
-            _detectedLabel = 'Jalur Bersih';
-          }
-        });
       }
     });
   }
