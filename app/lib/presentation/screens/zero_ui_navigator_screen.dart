@@ -6,6 +6,8 @@ import '../../core/services/camera_service.dart';
 import '../../core/services/vision_service.dart';
 import '../../core/services/arbitration_engine.dart';
 import '../../core/services/foreground_service.dart';
+import '../../core/services/permission_service.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 class ZeroUiNavigatorScreen extends StatefulWidget {
   const ZeroUiNavigatorScreen({super.key});
@@ -29,6 +31,9 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
   }
 
   Future<void> _bootstrapServices() async {
+    // 0. Minta izin runtime Android (Kamera, Notifikasi, Baterai)
+    final permissionsGranted = await PermissionService.requestAllPermissions();
+
     // 1. Inisialisasi Hardware Haptics
     final hasControl = await HapticService.hasAmplitudeControl();
     
@@ -38,13 +43,19 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
     // 3. Inisialisasi Model Vision Lokal
     await VisionService.initialize();
 
-    // 4. Inisialisasi Kamera Belakang
-    final cameraOk = await CameraService.initialize();
+    // 4. Inisialisasi Kamera Belakang jika izin diberikan
+    bool cameraOk = false;
+    if (permissionsGranted) {
+      cameraOk = await CameraService.initialize();
+    }
 
     if (cameraOk) {
       _startLiveCameraPipeline();
-      // Jalankan Android Foreground Service agar navigasi tetap aktif saat layar mati
+      // Jalankan Android Foreground Service & Wakelock agar navigasi tetap aktif saat layar mati
       ForegroundService.startService();
+      try {
+        await WakelockPlus.enable();
+      } catch (_) {}
     }
 
     if (mounted) {
@@ -52,7 +63,11 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
         _hasAmplitude = hasControl;
         _isCameraReady = cameraOk;
       });
-      TtsService.speakStatus('Netrava siap. Jalur aman.');
+      if (permissionsGranted && cameraOk) {
+        TtsService.speakStatus('Netrava siap. Jalur aman.');
+      } else {
+        TtsService.speakAlert('Izin kamera diperlukan.');
+      }
     }
   }
 
@@ -87,6 +102,9 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
 
   @override
   void dispose() {
+    try {
+      WakelockPlus.disable();
+    } catch (_) {}
     ForegroundService.stopService();
     CameraService.dispose();
     VisionService.dispose();

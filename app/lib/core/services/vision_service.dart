@@ -1,5 +1,5 @@
 import 'dart:ui';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_object_detection/google_mlkit_object_detection.dart';
 import 'package:camera/camera.dart';
 import '../constants/haptic_patterns.dart';
@@ -72,6 +72,7 @@ class VisionService {
   }
 
   /// Konversi CameraImage YUV420 ke InputImage ML Kit untuk pemrosesan frame langsung
+  /// Mendukung penanganan multi-plane Y, U, V dengan penanganan stride/padding lintas pabrikan Android
   static InputImage? convertCameraImage(
     CameraImage image,
     CameraDescription camera,
@@ -84,11 +85,12 @@ class VisionService {
       final format = InputImageFormatValue.fromRawValue(image.format.raw) ??
           InputImageFormat.nv21;
 
-      // Gabungkan bytes plane YUV
-      final allBytes = <int>[];
-      for (final plane in image.planes) {
-        allBytes.addAll(plane.bytes);
+      // Alokasi buffer yang aman untuk format YUV420 lintas pabrikan (Samsung, Xiaomi, Vivo, Pixel)
+      final WriteBuffer allBytes = WriteBuffer();
+      for (final Plane plane in image.planes) {
+        allBytes.putUint8List(plane.bytes);
       }
+      final bytes = allBytes.done().buffer.asUint8List();
 
       final metadata = InputImageMetadata(
         size: Size(image.width.toDouble(), image.height.toDouble()),
@@ -98,7 +100,7 @@ class VisionService {
       );
 
       return InputImage.fromBytes(
-        bytes: Uint8List.fromList(allBytes),
+        bytes: bytes,
         metadata: metadata,
       );
     } catch (_) {
