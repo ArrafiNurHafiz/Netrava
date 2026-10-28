@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
 import '../../core/constants/haptic_patterns.dart';
 import '../../core/services/haptic_service.dart';
 import '../../core/services/tts_service.dart';
@@ -311,18 +312,35 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          _isAiInspecting
-                              ? Icons.auto_awesome
-                              : _currentZone == ProximityZone.clear
-                                  ? Icons.check_circle_outline
-                                  : _currentZone == ProximityZone.critical
-                                      ? Icons.warning_amber_rounded
-                                      : Icons.vibration,
-                          color: _isAiInspecting ? Colors.amberAccent : Colors.white,
-                          size: 72,
-                        ),
-                        const SizedBox(height: 16),
+                        // Live Camera Feed Widget (Krusial agar hardware pipeline Android CameraX aktif mengirim frame)
+                        if (_isCameraReady && CameraService.controller != null)
+                          Container(
+                            width: 140,
+                            height: 140,
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: _isAiInspecting ? Colors.amberAccent : Colors.white30,
+                                width: 2,
+                              ),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: CameraPreview(CameraService.controller!),
+                          )
+                        else
+                          Icon(
+                            _isAiInspecting
+                                ? Icons.auto_awesome
+                                : _currentZone == ProximityZone.clear
+                                    ? Icons.check_circle_outline
+                                    : _currentZone == ProximityZone.critical
+                                        ? Icons.warning_amber_rounded
+                                        : Icons.vibration,
+                            color: _isAiInspecting ? Colors.amberAccent : Colors.white,
+                            size: 72,
+                          ),
+                        const SizedBox(height: 8),
                         Text(
                           _isAiInspecting
                               ? 'AI SEDANG MENGANALISIS...'

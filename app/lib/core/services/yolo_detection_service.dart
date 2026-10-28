@@ -143,7 +143,9 @@ class YoloDetectionService {
       final out = _outputTensor[0];
       final List<YoloDetection> detectedList = [];
 
-      for (int i = 0; i < 8400; i += 4) { // Subsample anchor box untuk efisiensi eksekusi
+      // Ambang batas keyakinan sensitif untuk objek dalam ruangan (Confidence threshold: 18%)
+      // Menangkap orang duduk, kursi kantor, meja, laptop, botol, pintu
+      for (int i = 0; i < 8400; i += 2) {
         double maxScore = 0.0;
         int maxClassId = 0;
 
@@ -155,28 +157,25 @@ class YoloDetectionService {
           }
         }
 
-        // Ambang batas keyakinan (Confidence threshold: 35%)
-        if (maxScore >= 0.35) {
-          // YOLOv8 model SpotLab output box coordinates are ALREADY NORMALIZED in [0.0 - 1.0]!
-          // DO NOT divide by inputSize (640), otherwise cx, cy, h become ~0.001 and fail all filters!
+        if (maxScore >= 0.18) {
           final cx = out[0][i];
           final cy = out[1][i];
           final h = out[3][i];
 
-          // Saring hanya objek yang berada di JALUR JALAN DEPAN (Koridor tengah X: 15% - 85%)
-          if (cx >= 0.15 && cx <= 0.85) {
-            final isUpper = cy < 0.65;
+          // Saring koridor pandang depan (X: 10% - 90%)
+          if (cx >= 0.10 && cx <= 0.90) {
+            final isUpper = cy < 0.70;
 
-            // Estimasi Jarak Geometris Nyata:
-            // - Kritis (< 1.0m): Tinggi kotak objek >= 38% tinggi layar
-            // - Waspada (1.0 - 2.0m): Tinggi kotak objek >= 20% tinggi layar
-            // - Jauh (> 2.0m): Tinggi kotak objek >= 10% tinggi layar
+            // Estimasi Jarak Ruangan:
+            // - Kritis (< 1.0m / Dekat meja/kursi/orang): Tinggi kotak objek >= 26%
+            // - Waspada (1.0 - 2.0m): Tinggi kotak objek >= 14%
+            // - Jauh (> 2.0m): Tinggi kotak objek >= 6%
             ProximityZone zone = ProximityZone.clear;
-            if (h >= 0.38) {
+            if (h >= 0.26) {
               zone = ProximityZone.critical;
-            } else if (h >= 0.20) {
+            } else if (h >= 0.14) {
               zone = ProximityZone.caution;
-            } else if (h >= 0.10) {
+            } else if (h >= 0.06) {
               zone = ProximityZone.awareness;
             }
 
