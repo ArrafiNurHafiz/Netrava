@@ -157,24 +157,26 @@ class YoloDetectionService {
 
         // Ambang batas keyakinan (Confidence threshold: 35%)
         if (maxScore >= 0.35) {
-          final cx = out[0][i] / inputSize;
-          final cy = out[1][i] / inputSize;
-          final h = out[3][i] / inputSize;
+          // YOLOv8 model SpotLab output box coordinates are ALREADY NORMALIZED in [0.0 - 1.0]!
+          // DO NOT divide by inputSize (640), otherwise cx, cy, h become ~0.001 and fail all filters!
+          final cx = out[0][i];
+          final cy = out[1][i];
+          final h = out[3][i];
 
-          // Saring hanya objek yang berada di JALUR JALAN DEPAN (Koridor tengah X: 20% - 80%)
-          if (cx >= 0.20 && cx <= 0.80) {
-            final isUpper = cy < 0.60;
+          // Saring hanya objek yang berada di JALUR JALAN DEPAN (Koridor tengah X: 15% - 85%)
+          if (cx >= 0.15 && cx <= 0.85) {
+            final isUpper = cy < 0.65;
 
             // Estimasi Jarak Geometris Nyata:
-            // - Kritis (< 1.0m): Tinggi kotak objek >= 45% tinggi layar
-            // - Waspada (1.0 - 2.0m): Tinggi kotak objek >= 24% tinggi layar
-            // - Jauh (> 2.0m): Tinggi kotak objek >= 12% tinggi layar
+            // - Kritis (< 1.0m): Tinggi kotak objek >= 38% tinggi layar
+            // - Waspada (1.0 - 2.0m): Tinggi kotak objek >= 20% tinggi layar
+            // - Jauh (> 2.0m): Tinggi kotak objek >= 10% tinggi layar
             ProximityZone zone = ProximityZone.clear;
-            if (h >= 0.45) {
+            if (h >= 0.38) {
               zone = ProximityZone.critical;
-            } else if (h >= 0.24) {
+            } else if (h >= 0.20) {
               zone = ProximityZone.caution;
-            } else if (h >= 0.12) {
+            } else if (h >= 0.10) {
               zone = ProximityZone.awareness;
             }
 

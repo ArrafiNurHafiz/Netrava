@@ -115,6 +115,15 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
             _detectedLabel = '${depthResult.label} (${depthResult.latencyMs}ms)';
           });
         }
+      } else {
+        // Jika keduanya kosong/bersih, pastikan kembali ke zona clear
+        if (_currentZone != ProximityZone.clear) {
+          setState(() {
+            _currentZone = ProximityZone.clear;
+            _detectedLabel = 'Jalur Bersih';
+          });
+          HapticService.cancel();
+        }
       }
     });
   }
