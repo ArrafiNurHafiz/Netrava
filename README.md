@@ -42,15 +42,24 @@ Netrava mengubah ponsel pintar menjadi sensor lingkungan proaktif yang memetakan
 
 ---
 
-## 📂 Struktur Dokumen Proyek
+## 📂 Struktur Proyek
 
 ```
-/home/arrafi/lomba/netrava/
-├── PRD.md            # Product Requirements Document standar (fitur, metrik, persona, risiko)
-├── ARCHITECTURE.md   # Arsitektur teknis detail, CameraX pipeline, MediaPipe, & Android Haptics
-├── PITCH.md          # Naskah presentasi 3 menit & panduan demonstrasi panggung juri GDGoC ITB
-├── AGENTS.md         # Instruksi rekayasa perangkat lunak standar
-└── README.md         # Ringkasan proyek & tumpukan teknologi
+.
+├── docs/                      # Dokumentasi teknis & rekayasa produk
+│   ├── PRD.md                 # Product Requirements Document
+│   ├── ARCHITECTURE.md        # Arsitektur sistem, camera pipeline, & haptics
+│   └── AGENTS.md              # Standar instruksi rekayasa & verifikasi
+├── app/                       # Source code aplikasi mobile Flutter (Android)
+│   ├── android/               # Native Android wrapper (CameraX, Haptics, Service)
+│   ├── lib/
+│   │   ├── core/              # Constants & background services
+│   │   │   ├── constants/     # HapticPatterns (Waveform timings & amplitude)
+│   │   │   └── services/      # CameraService, VisionService, HapticService, TTS
+│   │   ├── presentation/      # UI Layer (ZeroUiNavigatorScreen tactile surface)
+│   │   └── main.dart          # Entry point aplikasi
+│   └── test/                  # Automated unit & widget tests
+└── README.md                  # Ikhtisar proyek
 ```
 
 ---
