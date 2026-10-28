@@ -78,53 +78,70 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
     }
   }
 
-  /// Menghubungkan CameraX Stream ke Dual Engine: YOLOv8n (Objek Nyata) + MiDaS (Kedalaman Permukaan)
+  DateTime _lastInferenceTime = DateTime.fromMillisecondsSinceEpoch(0);
+  bool _isFrameBusy = false;
+
+  /// Menghubungkan CameraX Stream ke Pipeline Ter-Throttle (Hemat Baterai & Bebas Lag)
   void _startLiveCameraPipeline() {
     CameraService.startImageStream((image) async {
-      if (!_isScanning) return;
+      if (!_isScanning || _isFrameBusy) return;
 
-      // 1. Prioritas Utama: YOLOv8 Object Detection (Mendeteksi Orang, Motor, Mobil, Kursi, Meja, Tiang)
-      final yoloResult = await YoloDetectionService.detectObstacles(image);
-      if (yoloResult != null && yoloResult.detections.isNotEmpty) {
-        final zone = await _arbitration.evaluateYoloResult(
-          yoloResult,
-          onAutoAiTrigger: () {
-            _triggerSemanticAiInspection();
-          },
-        );
-        if (mounted && (zone != _currentZone || _detectedLabel != yoloResult.alertMessage)) {
-          setState(() {
-            _currentZone = zone;
-            _detectedLabel = '${yoloResult.alertMessage} (${yoloResult.latencyMs}ms)';
-          });
-        }
+      final now = DateTime.now();
+      // Throttle cerdas: Proses maksimal 3 - 4 frame per detik (interval 280ms)
+      // Mencegah lag antrean UI thread dan baterai panas
+      if (now.difference(_lastInferenceTime).inMilliseconds < 280) {
         return;
       }
 
-      // 2. Evaluasi Sekunder: MiDaS Depth Engine untuk Tembok Polos / Permukaan Datar
-      final depthResult = await DepthEstimationService.processCameraFrame(image);
-      if (depthResult != null) {
-        final zone = await _arbitration.evaluateDepthResult(
-          depthResult,
-          onAutoAiTrigger: () {
-            _triggerSemanticAiInspection();
-          },
-        );
-        if (mounted && (zone != _currentZone || _detectedLabel != depthResult.label)) {
-          setState(() {
-            _currentZone = zone;
-            _detectedLabel = '${depthResult.label} (${depthResult.latencyMs}ms)';
-          });
+      _isFrameBusy = true;
+      _lastInferenceTime = now;
+
+      try {
+        // 1. Prioritas Utama: YOLOv8 Object Detection (Orang, Kursi, Meja, Motor, Tiang)
+        final yoloResult = await YoloDetectionService.detectObstacles(image);
+        if (yoloResult != null && yoloResult.detections.isNotEmpty) {
+          final zone = await _arbitration.evaluateYoloResult(
+            yoloResult,
+            onAutoAiTrigger: () {
+              _triggerSemanticAiInspection();
+            },
+          );
+          if (mounted && (zone != _currentZone || _detectedLabel != yoloResult.alertMessage)) {
+            setState(() {
+              _currentZone = zone;
+              _detectedLabel = '${yoloResult.alertMessage} (${yoloResult.latencyMs}ms)';
+            });
+          }
+          return;
         }
-      } else {
-        // Jika keduanya kosong/bersih, pastikan kembali ke zona clear
-        if (_currentZone != ProximityZone.clear) {
-          setState(() {
-            _currentZone = ProximityZone.clear;
-            _detectedLabel = 'Jalur Bersih';
-          });
-          HapticService.cancel();
+
+        // 2. Evaluasi Sekunder: MiDaS Depth Engine untuk Tembok Polos / Permukaan Datar
+        final depthResult = await DepthEstimationService.processCameraFrame(image);
+        if (depthResult != null) {
+          final zone = await _arbitration.evaluateDepthResult(
+            depthResult,
+            onAutoAiTrigger: () {
+              _triggerSemanticAiInspection();
+            },
+          );
+          if (mounted && (zone != _currentZone || _detectedLabel != depthResult.label)) {
+            setState(() {
+              _currentZone = zone;
+              _detectedLabel = '${depthResult.label} (${depthResult.latencyMs}ms)';
+            });
+          }
+        } else {
+          if (_currentZone != ProximityZone.clear) {
+            setState(() {
+              _currentZone = ProximityZone.clear;
+              _detectedLabel = 'Jalur Bersih';
+            });
+            HapticService.cancel();
+          }
         }
+      } catch (_) {
+      } finally {
+        _isFrameBusy = false;
       }
     });
   }

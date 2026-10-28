@@ -25,8 +25,8 @@ class CameraService {
 
       _controller = CameraController(
         backCamera,
-        ResolutionPreset.medium, // 480p / 720p optimal untuk on-device inference
-        enableAudio: false,      // Hemat daya & tidak mengunci audio device
+        ResolutionPreset.low, // 240p / 360p ringan untuk mobile edge AI
+        enableAudio: false,   // Hemat daya & tidak mengunci audio device
         imageFormatGroup: ImageFormatGroup.yuv420, // Format stream native CameraX
       );
 
