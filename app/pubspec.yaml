@@ -2,7 +2,7 @@ name: netrava_app
 description: "Netrava - Lightweight Haptic Navigation Assistant for the Visually Impaired"
 publish_to: 'none'
 
-version: 2.2.1+17
+version: 2.2.2+18
 
 environment:
   sdk: ^3.13.7

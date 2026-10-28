@@ -1,6 +1,6 @@
 # Netrava — Haptic & Audio Navigation Assistant for the Visually Impaired
 
-[![Download APK](https://img.shields.io/badge/Download-Netrava%20APK%20(v2.2.1%20Aspect%20Ratio%20Fix)--blue?style=for-the-badge&logo=android)](https://github.com/ArrafiNurHafiz/Netrava/releases/latest/download/netrava-v2.2.1-release.apk)
+[![Download APK](https://img.shields.io/badge/Download-Netrava%20APK%20(v2.2.2%20Official%20Branding)--blue?style=for-the-badge&logo=android)](https://github.com/ArrafiNurHafiz/Netrava/releases/latest/download/netrava-v2.2.2-release.apk)
 
 Netrava adalah asisten navigasi taktil cerdas berbasis **Android APK (Flutter / Android Native)** bertenaga komputasi optik deterministik (*Instant Optical Proximity*) yang dirancang khusus untuk mobilitas penyandang disabilitas netra. Proyek ini dipersiapkan untuk kompetisi **Google Developer on Campus (GDGoC) ITB Challenge 2026**.
 
@@ -12,14 +12,15 @@ Netrava mengubah ponsel pintar menjadi sensor lingkungan proaktif yang memetakan
 
 Aplikasi Android Netrava siap diunduh dan dipasang langsung pada ponsel pintar Android Anda:
 
-- **Tautan Unduh Langsung (Versi v2.2.1 - Kamera Proporsional Tidak Gepeng):** [netrava-v2.2.1-release.apk](https://github.com/ArrafiNurHafiz/Netrava/releases/latest/download/netrava-v2.2.1-release.apk)
-- **Halaman Rilis GitHub:** [GitHub Releases Netrava](https://github.com/ArrafiNurHafiz/Netrava/releases/tag/v2.2.1)
+- **Tautan Unduh Langsung (Versi v2.2.2 - Nama & Ikon Resmi Netrava):** [netrava-v2.2.2-release.apk](https://github.com/ArrafiNurHafiz/Netrava/releases/latest/download/netrava-v2.2.2-release.apk)
+- **Halaman Rilis GitHub:** [GitHub Releases Netrava](https://github.com/ArrafiNurHafiz/Netrava/releases/tag/v2.2.2)
 
 ### Panduan Instalasi di Ponsel:
 1. Klik tautan unduh di atas menggunakan peramban ponsel Android Anda.
-2. Buka berkas `netrava-v2.2.1-release.apk` yang telah diunduh, lalu pilih **Install**.
-3. Buka aplikasi Netrava, lalu klik **Izinkan** pada pop-up izin **Kamera** dan **Notifikasi**.
-4. Selipkan ponsel di saku kemeja bagian dada dengan kamera menghadap ke depan. Anda dapat mematikan layar ponsel untuk menghemat daya; Netrava akan tetap memandu langkah Anda melalui getaran di dada.
+2. Buka berkas `netrava-v2.2.2-release.apk` yang telah diunduh, lalu pilih **Install**.
+3. Di layar utama / app drawer ponsel Anda, aplikasi kini tampil dengan nama **Netrava** dan ikon logo resmi bertema gelombang taktil biru.
+4. Buka aplikasi Netrava, lalu klik **Izinkan** pada pop-up izin **Kamera** dan **Notifikasi**.
+5. Selipkan ponsel di saku kemeja bagian dada dengan kamera menghadap ke depan. Anda dapat mematikan layar ponsel untuk menghemat daya; Netrava akan tetap memandu langkah Anda melalui getaran di dada.
 
 ---
 
