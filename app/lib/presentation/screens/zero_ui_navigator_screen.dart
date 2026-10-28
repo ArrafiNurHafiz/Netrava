@@ -346,7 +346,7 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
 
                 // 2. CAMERA PREVIEW CARD (Rounded Card with live active feed)
                 Container(
-                  height: 200,
+                  height: 220,
                   width: double.infinity,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20),
@@ -363,7 +363,14 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
                     fit: StackFit.expand,
                     children: [
                       if (_isCameraReady && CameraService.controller != null)
-                        CameraPreview(CameraService.controller!)
+                        FittedBox(
+                          fit: BoxFit.cover,
+                          child: SizedBox(
+                            width: 100,
+                            height: 100 * CameraService.controller!.value.aspectRatio,
+                            child: CameraPreview(CameraService.controller!),
+                          ),
+                        )
                       else
                         Container(
                           color: const Color(0xFF0F172A),
