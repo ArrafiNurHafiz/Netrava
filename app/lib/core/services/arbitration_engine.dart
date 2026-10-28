@@ -97,7 +97,10 @@ class ArbitrationEngine {
   }
 
   /// Evaluasi hasil estimasi kedalaman fisik MiDaS (Prioritas Primer)
-  Future<ProximityZone> evaluateDepthResult(DepthResult result) async {
+  Future<ProximityZone> evaluateDepthResult(
+    DepthResult result, {
+    Function()? onAutoAiTrigger,
+  }) async {
     if (!_isActive) return ProximityZone.clear;
 
     final highestZone = result.zone;
@@ -124,6 +127,11 @@ class ArbitrationEngine {
         _lastSpeechAlertTime = now;
         await TtsService.speakAlert('Waspada!');
       }
+    }
+
+    // 3. Proaktif Otomatis AI Inspection jika terhenti di depan objek kritis
+    if (_isAutoAiInspectionEligible(highestZone) && onAutoAiTrigger != null) {
+      onAutoAiTrigger();
     }
 
     return highestZone;

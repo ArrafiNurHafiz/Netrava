@@ -5,7 +5,6 @@ import '../../core/services/tts_service.dart';
 import '../../core/services/camera_service.dart';
 import '../../core/services/vision_service.dart';
 import '../../core/services/depth_estimation_service.dart';
-import '../../core/services/fast_proximity_engine.dart';
 import '../../core/services/arbitration_engine.dart';
 import '../../core/services/foreground_service.dart';
 import '../../core/services/permission_service.dart';
@@ -76,26 +75,25 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
     }
   }
 
-  /// Menghubungkan CameraX Stream ke Instant Fast Proximity Engine (Zero-Lag)
+  /// Menghubungkan CameraX Stream ke Neural MiDaS Depth Engine Asli
   void _startLiveCameraPipeline() {
     CameraService.startImageStream((image) async {
       if (!_isScanning) return;
 
-      // 1. Eksekusi Cepat Instan (1-3 ms): Luminance Edge & Obstacle Occupancy
-      final fastAnalysis = FastProximityEngine.processFrame(image);
-      if (fastAnalysis != null) {
-        final zone = await _arbitration.evaluateProximityAnalysis(
-          fastAnalysis,
+      // 1. Eksekusi Model Neural Network MiDaS Depth (Akurasi Tinggi & Cepat)
+      final depthResult = await DepthEstimationService.processCameraFrame(image);
+      if (depthResult != null) {
+        final zone = await _arbitration.evaluateDepthResult(
+          depthResult,
           onAutoAiTrigger: () {
             // PROAKTIF OTOMATIS: Pengguna terhenti di depan objek kritis (gerbang/pintu/palang)
-            // AI langsung menjelaskan tanpa perlu sentuh tombol
             _triggerSemanticAiInspection();
           },
         );
-        if (mounted && (zone != _currentZone || _detectedLabel != fastAnalysis.label)) {
+        if (mounted && (zone != _currentZone || _detectedLabel != depthResult.label)) {
           setState(() {
             _currentZone = zone;
-            _detectedLabel = '${fastAnalysis.label} (${fastAnalysis.latencyMs}ms)';
+            _detectedLabel = '${depthResult.label} (${depthResult.latencyMs}ms | D:${depthResult.centerDepth.toInt()})';
           });
         }
       }

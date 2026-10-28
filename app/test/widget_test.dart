@@ -78,9 +78,10 @@ void main() {
 
       final criticalDepth = DepthResult(
         zone: ProximityZone.critical,
-        maxDepthScore: 0.88,
-        upperHazardScore: 0.72,
+        centerDepth: 610.0,
+        centerRatio: 1.30,
         label: 'Tembok Dekat (< 1M)',
+        latencyMs: 32,
       );
 
       final evaluatedZone = await engine.evaluateDepthResult(criticalDepth);
