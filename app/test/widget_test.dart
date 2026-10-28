@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:netrava_app/main.dart';
 import 'package:netrava_app/core/constants/haptic_patterns.dart';
 import 'package:netrava_app/core/services/vision_service.dart';
+import 'package:netrava_app/core/services/arbitration_engine.dart';
 
 void main() {
   testWidgets('Netrava smoke test renders app and zero-ui', (WidgetTester tester) async {
@@ -47,6 +48,30 @@ void main() {
 
       const floorBox = Rect.fromLTWH(100, 500, 150, 120);
       expect(VisionService.isUpperHazard(floorBox, frameSize), isFalse);
+    });
+  });
+
+  group('ArbitrationEngine Tests', () {
+    test('Arbitration prioritizes critical upper hazard over clear state', () async {
+      final engine = ArbitrationEngine();
+
+      final criticalObstacle = DetectedObstacle(
+        label: 'Low Hanging Branch',
+        confidence: 0.9,
+        boundingBox: const Rect.fromLTWH(50, 20, 300, 300),
+        zone: ProximityZone.critical,
+        isUpperBodyHazard: true,
+      );
+
+      final evaluatedZone = await engine.evaluateObstacles([criticalObstacle]);
+      expect(evaluatedZone, ProximityZone.critical);
+      expect(engine.currentZone, ProximityZone.critical);
+    });
+
+    test('Arbitration returns clear when obstacle list is empty', () async {
+      final engine = ArbitrationEngine();
+      final evaluatedZone = await engine.evaluateObstacles([]);
+      expect(evaluatedZone, ProximityZone.clear);
     });
   });
 }

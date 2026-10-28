@@ -1,5 +1,7 @@
 import 'dart:ui';
+import 'dart:typed_data';
 import 'package:google_mlkit_object_detection/google_mlkit_object_detection.dart';
+import 'package:camera/camera.dart';
 import '../constants/haptic_patterns.dart';
 
 class DetectedObstacle {
@@ -67,6 +69,41 @@ class VisionService {
   static bool isUpperHazard(Rect boundingBox, Size imageSize) {
     // Top box berada di setengah layar atas (0.0 sampai 0.6 dari atas frame)
     return boundingBox.top < (imageSize.height * 0.65);
+  }
+
+  /// Konversi CameraImage YUV420 ke InputImage ML Kit untuk pemrosesan frame langsung
+  static InputImage? convertCameraImage(
+    CameraImage image,
+    CameraDescription camera,
+  ) {
+    try {
+      final sensorOrientation = camera.sensorOrientation;
+      final rotation = InputImageRotationValue.fromRawValue(sensorOrientation) ??
+          InputImageRotation.rotation90deg;
+
+      final format = InputImageFormatValue.fromRawValue(image.format.raw) ??
+          InputImageFormat.nv21;
+
+      // Gabungkan bytes plane YUV
+      final allBytes = <int>[];
+      for (final plane in image.planes) {
+        allBytes.addAll(plane.bytes);
+      }
+
+      final metadata = InputImageMetadata(
+        size: Size(image.width.toDouble(), image.height.toDouble()),
+        rotation: rotation,
+        format: format,
+        bytesPerRow: image.planes.first.bytesPerRow,
+      );
+
+      return InputImage.fromBytes(
+        bytes: Uint8List.fromList(allBytes),
+        metadata: metadata,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Proses frame citra kamera on-device

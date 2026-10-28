@@ -3,6 +3,8 @@ import '../../core/constants/haptic_patterns.dart';
 import '../../core/services/haptic_service.dart';
 import '../../core/services/tts_service.dart';
 import '../../core/services/camera_service.dart';
+import '../../core/services/vision_service.dart';
+import '../../core/services/arbitration_engine.dart';
 
 class ZeroUiNavigatorScreen extends StatefulWidget {
   const ZeroUiNavigatorScreen({super.key});
@@ -12,11 +14,12 @@ class ZeroUiNavigatorScreen extends StatefulWidget {
 }
 
 class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
-  bool _isSilentMode = false;
+  final ArbitrationEngine _arbitration = ArbitrationEngine();
   bool _isScanning = true;
   ProximityZone _currentZone = ProximityZone.clear;
   bool _hasAmplitude = false;
   bool _isCameraReady = false;
+  String _detectedLabel = 'Jalur Bersih';
 
   @override
   void initState() {
@@ -31,34 +34,70 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
     // 2. Inisialisasi Google TTS Luring
     await TtsService.initialize();
 
-    // 3. Inisialisasi Kamera Belakang
+    // 3. Inisialisasi Model Vision Lokal
+    await VisionService.initialize();
+
+    // 4. Inisialisasi Kamera Belakang
     final cameraOk = await CameraService.initialize();
+
+    if (cameraOk) {
+      _startLiveCameraPipeline();
+    }
 
     if (mounted) {
       setState(() {
         _hasAmplitude = hasControl;
         _isCameraReady = cameraOk;
       });
-      // Beri pengumuman audio pembuka
       TtsService.speakStatus('Netrava siap. Jalur aman.');
     }
+  }
+
+  /// Menghubungkan CameraX Stream ke VisionService & ArbitrationEngine
+  void _startLiveCameraPipeline() {
+    CameraService.startImageStream((image) async {
+      if (!_isScanning) return;
+
+      final camera = CameraService.cameraDescription;
+      if (camera == null) return;
+
+      final inputImage = VisionService.convertCameraImage(image, camera);
+      if (inputImage == null) return;
+
+      final size = Size(image.width.toDouble(), image.height.toDouble());
+      final obstacles = await VisionService.processImage(inputImage, size);
+
+      final zone = await _arbitration.evaluateObstacles(obstacles);
+
+      if (mounted && zone != _currentZone) {
+        setState(() {
+          _currentZone = zone;
+          if (obstacles.isNotEmpty) {
+            _detectedLabel = obstacles.first.label;
+          } else {
+            _detectedLabel = 'Jalur Bersih';
+          }
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     CameraService.dispose();
+    VisionService.dispose();
     TtsService.stop();
     HapticService.cancel();
     super.dispose();
   }
 
   void _onSingleTap() {
-    // Zero-UI: Pengumuman status suara luring
     final statusMsg = '${_isScanning ? "Memindai aktif" : "Jeda"}. '
-        '${_isSilentMode ? "Mode haptik senyap" : "Mode suara aktif"}. '
-        'Kamera ${_isCameraReady ? "aktif" : "siap simulasi"}.';
+        '${_arbitration.isSilentMode ? "Mode haptik senyap" : "Mode suara aktif"}. '
+        'Kamera ${_isCameraReady ? "aktif" : "siap simulasi"}. '
+        'Objek: $_detectedLabel.';
 
-    if (!_isSilentMode) {
+    if (!_arbitration.isSilentMode) {
       TtsService.speakStatus(statusMsg);
     }
 
@@ -67,7 +106,7 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
       SnackBar(
         content: Text(
           'Status: ${_isScanning ? "Memindai" : "Jeda"}. '
-          'Mode: ${_isSilentMode ? "Senyap" : "Suara+Haptik"}. '
+          'Mode: ${_arbitration.isSilentMode ? "Senyap" : "Suara+Haptik"}. '
           'Kamera: ${_isCameraReady ? "Aktif" : "Simulasi"}. '
           'Motor: ${_hasAmplitude ? "PWM" : "DutyCycle"}.',
         ),
@@ -77,14 +116,13 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
   }
 
   void _onDoubleTap() {
-    // Zero-UI: Beralih mode senyap
     setState(() {
-      _isSilentMode = !_isSilentMode;
+      _arbitration.setSilentMode(!_arbitration.isSilentMode);
     });
 
     HapticService.triggerZone(ProximityZone.caution);
 
-    if (!_isSilentMode) {
+    if (!_arbitration.isSilentMode) {
       TtsService.speakStatus('Mode suara aktif');
     } else {
       TtsService.stop();
@@ -92,37 +130,45 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
   }
 
   void _onLongPress() {
-    // Zero-UI: Jeda / Lanjutkan pemindaian
     setState(() {
       _isScanning = !_isScanning;
+      _arbitration.setActive(_isScanning);
       if (!_isScanning) {
         _currentZone = ProximityZone.clear;
-        HapticService.cancel();
-        CameraService.stopImageStream();
+        _detectedLabel = 'Pemindaian Dijeda';
       }
     });
 
     HapticService.triggerZone(ProximityZone.awareness);
-    if (!_isSilentMode) {
+    if (!_arbitration.isSilentMode) {
       TtsService.speakStatus(_isScanning ? 'Pemindaian dimulai' : 'Pemindaian dijeda');
     }
   }
 
-  void _simulateObstacleZone(ProximityZone zone) {
+  void _simulateObstacleZone(ProximityZone zone) async {
     if (!_isScanning) return;
-    setState(() {
-      _currentZone = zone;
-    });
-    HapticService.triggerZone(zone);
+    
+    // Buat objek simulasi sesuai tombol demo
+    final simulatedObstacle = DetectedObstacle(
+      label: zone == ProximityZone.critical
+          ? 'Tiang / Dahan'
+          : zone == ProximityZone.caution
+              ? 'Pejalan Kaki'
+              : 'Objek Jauh',
+      confidence: 0.95,
+      boundingBox: const Rect.fromLTWH(50, 50, 300, 300),
+      zone: zone,
+      isUpperBodyHazard: zone == ProximityZone.critical,
+    );
 
-    // Peringatan darurat 1 kata via TTS jika kritis dan bukan mode senyap
-    if (!_isSilentMode) {
-      if (zone == ProximityZone.critical) {
-        TtsService.speakAlert('Berhenti!');
-      } else if (zone == ProximityZone.caution) {
-        TtsService.speakAlert('Waspada!');
-      }
-    }
+    final evaluatedZone = await _arbitration.evaluateObstacles(
+      zone == ProximityZone.clear ? [] : [simulatedObstacle],
+    );
+
+    setState(() {
+      _currentZone = evaluatedZone;
+      _detectedLabel = simulatedObstacle.label;
+    });
   }
 
   Color _getZoneColor() {
@@ -202,6 +248,15 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
                             color: Colors.white,
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Deteksi: $_detectedLabel',
+                          style: TextStyle(
+                            color: Colors.white.withAlpha(204),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ],

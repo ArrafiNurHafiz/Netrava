@@ -2,9 +2,11 @@ import 'package:camera/camera.dart';
 
 class CameraService {
   static CameraController? _controller;
+  static CameraDescription? _cameraDescription;
   static bool _isStreaming = false;
 
   static CameraController? get controller => _controller;
+  static CameraDescription? get cameraDescription => _cameraDescription;
   static bool get isInitialized => _controller != null && _controller!.value.isInitialized;
   static bool get isStreaming => _isStreaming;
 
@@ -19,6 +21,7 @@ class CameraService {
         (cam) => cam.lensDirection == CameraLensDirection.back,
         orElse: () => cameras.first,
       );
+      _cameraDescription = backCamera;
 
       _controller = CameraController(
         backCamera,
