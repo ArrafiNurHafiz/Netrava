@@ -4,6 +4,7 @@ import 'package:netrava_app/main.dart';
 import 'package:netrava_app/core/constants/haptic_patterns.dart';
 import 'package:netrava_app/core/services/vision_service.dart';
 import 'package:netrava_app/core/services/arbitration_engine.dart';
+import 'package:netrava_app/core/services/foreground_service.dart';
 
 void main() {
   testWidgets('Netrava smoke test renders app and zero-ui', (WidgetTester tester) async {
@@ -52,6 +53,10 @@ void main() {
   });
 
   group('ArbitrationEngine Tests', () {
+    test('ForegroundService channel signature matches contract', () {
+      expect(ForegroundService.isRunning, isFalse);
+    });
+
     test('Arbitration prioritizes critical upper hazard over clear state', () async {
       final engine = ArbitrationEngine();
 

@@ -11,9 +11,25 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "netrava.app/haptics"
+    private val SERVICE_CHANNEL = "netrava.app/foreground_service"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        // Handler Service Latar Belakang (Layar Mati)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SERVICE_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "startService" -> {
+                    NetravaForegroundService.startService(this)
+                    result.success(true)
+                }
+                "stopService" -> {
+                    NetravaForegroundService.stopService(this)
+                    result.success(true)
+                }
+                else -> result.notImplemented()
+            }
+        }
 
         val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager

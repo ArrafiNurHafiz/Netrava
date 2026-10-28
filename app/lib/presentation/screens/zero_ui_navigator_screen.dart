@@ -5,6 +5,7 @@ import '../../core/services/tts_service.dart';
 import '../../core/services/camera_service.dart';
 import '../../core/services/vision_service.dart';
 import '../../core/services/arbitration_engine.dart';
+import '../../core/services/foreground_service.dart';
 
 class ZeroUiNavigatorScreen extends StatefulWidget {
   const ZeroUiNavigatorScreen({super.key});
@@ -42,6 +43,8 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
 
     if (cameraOk) {
       _startLiveCameraPipeline();
+      // Jalankan Android Foreground Service agar navigasi tetap aktif saat layar mati
+      ForegroundService.startService();
     }
 
     if (mounted) {
@@ -84,6 +87,7 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
 
   @override
   void dispose() {
+    ForegroundService.stopService();
     CameraService.dispose();
     VisionService.dispose();
     TtsService.stop();
@@ -136,6 +140,9 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
       if (!_isScanning) {
         _currentZone = ProximityZone.clear;
         _detectedLabel = 'Pemindaian Dijeda';
+        ForegroundService.stopService();
+      } else {
+        ForegroundService.startService();
       }
     });
 
