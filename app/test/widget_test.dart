@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:netrava_app/main.dart';
 import 'package:netrava_app/core/constants/haptic_patterns.dart';
 import 'package:netrava_app/core/services/vision_service.dart';
+import 'package:netrava_app/core/services/depth_estimation_service.dart';
 import 'package:netrava_app/core/services/arbitration_engine.dart';
 import 'package:netrava_app/core/services/foreground_service.dart';
 import 'package:netrava_app/core/services/permission_service.dart';
@@ -54,6 +55,21 @@ void main() {
   });
 
   group('ArbitrationEngine Tests', () {
+    test('DepthResult evaluated correctly by ArbitrationEngine', () async {
+      final engine = ArbitrationEngine();
+
+      final criticalDepth = DepthResult(
+        zone: ProximityZone.critical,
+        maxDepthScore: 0.88,
+        upperHazardScore: 0.72,
+        label: 'Tembok Dekat (< 1M)',
+      );
+
+      final evaluatedZone = await engine.evaluateDepthResult(criticalDepth);
+      expect(evaluatedZone, ProximityZone.critical);
+      expect(engine.currentZone, ProximityZone.critical);
+    });
+
     test('ForegroundService channel signature matches contract', () {
       expect(ForegroundService.isRunning, isFalse);
     });

@@ -4,6 +4,7 @@ import '../../core/services/haptic_service.dart';
 import '../../core/services/tts_service.dart';
 import '../../core/services/camera_service.dart';
 import '../../core/services/vision_service.dart';
+import '../../core/services/depth_estimation_service.dart';
 import '../../core/services/arbitration_engine.dart';
 import '../../core/services/foreground_service.dart';
 import '../../core/services/permission_service.dart';
@@ -40,8 +41,9 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
     // 2. Inisialisasi Google TTS Luring
     await TtsService.initialize();
 
-    // 3. Inisialisasi Model Vision Lokal
+    // 3. Inisialisasi Model Vision & MiDaS Depth
     await VisionService.initialize();
+    await DepthEstimationService.initialize();
 
     // 4. Inisialisasi Kamera Belakang jika izin diberikan
     bool cameraOk = false;
@@ -71,11 +73,26 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
     }
   }
 
-  /// Menghubungkan CameraX Stream ke VisionService & ArbitrationEngine
+  /// Menghubungkan CameraX Stream ke Dual Engine: MiDaS Depth + ML Kit Fallback
   void _startLiveCameraPipeline() {
     CameraService.startImageStream((image) async {
       if (!_isScanning) return;
 
+      // 1. Prioritaskan Estimasi Kedalaman Fisik Nyata (MiDaS v2.1 Depth Map)
+      // Mampu mendeteksi tembok polos, pintu, tiang, kaca buram, dahan pohon
+      final depthResult = await DepthEstimationService.processCameraFrame(image);
+      if (depthResult != null) {
+        final zone = await _arbitration.evaluateDepthResult(depthResult);
+        if (mounted && zone != _currentZone) {
+          setState(() {
+            _currentZone = zone;
+            _detectedLabel = depthResult.label;
+          });
+        }
+        return;
+      }
+
+      // 2. Fallback ke Bounding Box Object Detector jika Depth Engine busy
       final camera = CameraService.cameraDescription;
       if (camera == null) return;
 
@@ -108,6 +125,7 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
     ForegroundService.stopService();
     CameraService.dispose();
     VisionService.dispose();
+    DepthEstimationService.dispose();
     TtsService.stop();
     HapticService.cancel();
     super.dispose();
