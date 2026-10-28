@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/haptic_patterns.dart';
 import '../../core/services/haptic_service.dart';
+import '../../core/services/tts_service.dart';
+import '../../core/services/camera_service.dart';
 
 class ZeroUiNavigatorScreen extends StatefulWidget {
   const ZeroUiNavigatorScreen({super.key});
@@ -14,32 +16,60 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
   bool _isScanning = true;
   ProximityZone _currentZone = ProximityZone.clear;
   bool _hasAmplitude = false;
+  bool _isCameraReady = false;
 
   @override
   void initState() {
     super.initState();
-    _checkHardwareHaptics();
+    _bootstrapServices();
   }
 
-  Future<void> _checkHardwareHaptics() async {
+  Future<void> _bootstrapServices() async {
+    // 1. Inisialisasi Hardware Haptics
     final hasControl = await HapticService.hasAmplitudeControl();
+    
+    // 2. Inisialisasi Google TTS Luring
+    await TtsService.initialize();
+
+    // 3. Inisialisasi Kamera Belakang
+    final cameraOk = await CameraService.initialize();
+
     if (mounted) {
       setState(() {
         _hasAmplitude = hasControl;
+        _isCameraReady = cameraOk;
       });
+      // Beri pengumuman audio pembuka
+      TtsService.speakStatus('Netrava siap. Jalur aman.');
     }
   }
 
+  @override
+  void dispose() {
+    CameraService.dispose();
+    TtsService.stop();
+    HapticService.cancel();
+    super.dispose();
+  }
+
   void _onSingleTap() {
-    // Zero-UI: Pengumuman status saat ini
+    // Zero-UI: Pengumuman status suara luring
+    final statusMsg = '${_isScanning ? "Memindai aktif" : "Jeda"}. '
+        '${_isSilentMode ? "Mode haptik senyap" : "Mode suara aktif"}. '
+        'Kamera ${_isCameraReady ? "aktif" : "siap simulasi"}.';
+
+    if (!_isSilentMode) {
+      TtsService.speakStatus(statusMsg);
+    }
+
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Status: ${_isScanning ? "Memindai aktif" : "Jeda"}. '
-          'Mode: ${_isSilentMode ? "Haptik Senyap" : "Suara+Haptik"}. '
-          'Zona: ${_currentZone.name.toUpperCase()}. '
-          'Motor: ${_hasAmplitude ? "Amplitudo PWM (Modern)" : "Duty-cycle Fallback"}',
+          'Status: ${_isScanning ? "Memindai" : "Jeda"}. '
+          'Mode: ${_isSilentMode ? "Senyap" : "Suara+Haptik"}. '
+          'Kamera: ${_isCameraReady ? "Aktif" : "Simulasi"}. '
+          'Motor: ${_hasAmplitude ? "PWM" : "DutyCycle"}.',
         ),
         duration: const Duration(seconds: 2),
       ),
@@ -51,8 +81,14 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
     setState(() {
       _isSilentMode = !_isSilentMode;
     });
-    // Beri konfirmasi getaran 2x
+
     HapticService.triggerZone(ProximityZone.caution);
+
+    if (!_isSilentMode) {
+      TtsService.speakStatus('Mode suara aktif');
+    } else {
+      TtsService.stop();
+    }
   }
 
   void _onLongPress() {
@@ -62,9 +98,14 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
       if (!_isScanning) {
         _currentZone = ProximityZone.clear;
         HapticService.cancel();
+        CameraService.stopImageStream();
       }
     });
+
     HapticService.triggerZone(ProximityZone.awareness);
+    if (!_isSilentMode) {
+      TtsService.speakStatus(_isScanning ? 'Pemindaian dimulai' : 'Pemindaian dijeda');
+    }
   }
 
   void _simulateObstacleZone(ProximityZone zone) {
@@ -73,6 +114,15 @@ class _ZeroUiNavigatorScreenState extends State<ZeroUiNavigatorScreen> {
       _currentZone = zone;
     });
     HapticService.triggerZone(zone);
+
+    // Peringatan darurat 1 kata via TTS jika kritis dan bukan mode senyap
+    if (!_isSilentMode) {
+      if (zone == ProximityZone.critical) {
+        TtsService.speakAlert('Berhenti!');
+      } else if (zone == ProximityZone.caution) {
+        TtsService.speakAlert('Waspada!');
+      }
+    }
   }
 
   Color _getZoneColor() {
